@@ -61,6 +61,12 @@ function MAJFixes{
         # Here we retrieve the processed file to perform the update in AD
         $file_maj_fixes = Import-Csv -Path "$FolderFile\Result.CSV" -Delimiter ";"
         # This loop takes each line from the file and checks if the username exists in AD, if it does, it checks if a primary number is specified in the corresponding column. If a primary number is specified, it adds it; otherwise, it adds the secondary number.
+        
+        $totalFixes = $file_maj_fixes.Count
+        $i = 0
+
+        $TextBox.AppendText("----- numéros fixes/ip mis à jour -----`r`n")
+        
         Foreach($User in $file_maj_fixes){
             $Nom_AD = $User.nom_AD
             if (Get-ADUser -Filter "Name -like ""$Nom_AD"""){
@@ -68,31 +74,54 @@ function MAJFixes{
                 $phone_public = $User.numero_public
                 if ($phone_public -like $null -and $num_pere -like $null){
                     $ipPhone = $User.numero_interne
-                    $identity = (Get-ADUser -Filter "Name -like ""$Nom_AD""").SamAccountName
-                    Set-ADUser -Identity $identity -Replace @{ipPhone = $ipPhone}
-                    #Write-Host "Person : $Nom_AD, Tel ip : $ipPhone"
+                    if((Get-ADUser -Filter "Name -like ""$Nom_AD""" -Properties *).ipPhone -notlike $ipPhone ){
+                        $identity = (Get-ADUser -Filter "Name -like ""$Nom_AD""").SamAccountName
+                        Set-ADUser -Identity $identity -Replace @{ipPhone = $ipPhone}
+                        $TextBox.AppendText("Personne : $Nom_AD, Tel ip : $ipPhone`r`n")
+                        #Write-Host "Personne : $Nom_AD, Tel ip : $ipPhone"
+                    }
+                    
                 }
+
                 if ($phone_public -like $null -and $num_pere -notlike $null){
-                    $ipPhone = $User.numero_pere
-                    $identity = (Get-ADUser -Filter "Name -like ""$Nom_AD""").SamAccountName
-                    Set-ADUser -Identity $identity -Replace @{ipPhone = $ipPhone}
-                    #Write-Host "Person : $Nom_AD, Tel ip : $ipPhone"
-                }                                                                                                                                                                                          
+                    $ipPhone = $User.numero_interne
+                    if((Get-ADUser -Filter "Name -like ""$Nom_AD""" -Properties *).ipPhone -notlike $ipPhone ){
+                        $identity = (Get-ADUser -Filter "Name -like ""$Nom_AD""").SamAccountName
+                        Set-ADUser -Identity $identity -Replace @{ipPhone = $ipPhone}
+                        $TextBox.AppendText("Personne : $Nom_AD, Tel ip : $ipPhone`r`n")
+                        #Write-Host "Personne : $Nom_AD, Tel ip : $ipPhone"
+                    }
+                }    
+                                                                                                                                                                                                      
                 if ($phone_public -notlike $null -and $num_pere -like $null){                                                                                                                                                           
                     $OffPhone = $User.numero_public
                     $ipPhone = $User.numero_interne
-                    $identity = (Get-ADUser -Filter "Name -like ""$Nom_AD""").SamAccountName
-                    Set-ADUser -Identity $identity -Replace @{ipPhone = $ipPhone} -OfficePhone $OffPhone
-                    #Write-Host "Person : $Nom_AD, Tel ip : $ipPhone, Office Phone : $OffPhone"
+                    if(((Get-ADUser -Filter "Name -like ""$Nom_AD""" -Properties *).ipPhone -notlike $ipPhone) -or ((Get-ADUser -Filter "Name -like ""$Nom_AD""" -Properties *).OfficePhone -notlike $OffPhone)){
+                        $identity = (Get-ADUser -Filter "Name -like ""$Nom_AD""").SamAccountName
+                        Set-ADUser -Identity $identity -Replace @{ipPhone = $ipPhone} -OfficePhone $OffPhone
+                        $TextBox.AppendText("Personne : $Nom_AD, tel ip : $ipPhone, Tel fixe : $OffPhone`r`n")
+                        #Write-Host "Personne : $Nom_AD, Tel ip : $ipPhone, Tel fixe : $OffPhone"
+                    }
+                    
                 }
+
                 if($phone_public -notlike $null -and $num_pere -notlike $null){
                     $OffPhone = $User.numero_public
                     $ipPhone = $User.numero_pere
-                    $identity = (Get-ADUser -Filter "Name -like ""$Nom_AD""").SamAccountName
-                    Set-ADUser -Identity $identity -Replace @{ipPhone = $ipPhone} -OfficePhone $OffPhone
-                    #Write-Host "Person : $Nom_AD, Tel ip : $ipPhone, Office Phone : $OffPhone"
+                    if(((Get-ADUser -Filter "Name -like ""$Nom_AD""" -Properties *).ipPhone -notlike $ipPhone) -or ((Get-ADUser -Filter "Name -like ""$Nom_AD""" -Properties *).OfficePhone -notlike $OffPhone)){
+                        $identity = (Get-ADUser -Filter "Name -like ""$Nom_AD""").SamAccountName
+                        Set-ADUser -Identity $identity -Replace @{ipPhone = $ipPhone} -OfficePhone $OffPhone
+                        $TextBox.AppendText("Personne : $Nom_AD, tel ip : $ipPhone, Tel fixe : $OffPhone`r`n")
+                        #Write-Host "Personne : $Nom_AD, Tel ip : $ipPhone, Tel fixe : $OffPhone"
+                    }
                 }
             }
+            $percentage = [math]::Round(($i / $totalFixes) * 100 )
+            $i += 1
+            $ProgressBar.Value = $percentage
+
+            # Rafraîchir la fenêtre pour mettre à jour l'affichage de la barre de progression
+            $ProgressBar.Refresh()
         }
     }
         # Deletes the modified file so that there is no trace of it on the machine of the person executing the program.
@@ -120,8 +149,8 @@ function MAJMobiles{
     if ($MobilesPath -notlike $null){
         # Extraction des données du fichier CSV sélectionné et stockage dans un nouveau fichier CSV
         Import-Csv -Path $MobilesPath -Delimiter ";" -Encoding Default| `
-        Select-Object @{ expression={$_."nom utilisateur"}; label='nom_utilisateur' },@{ expression={$_."numéro"}; label='numero_mobile' } | Where-Object {$_ -notmatch ' - '} | `
-        Where-Object {$_ -notmatch 'BE'} | `
+        Select-Object @{ expression={$_."nom utilisateur"}; label='nom_utilisateur' },@{ expression={$_."numéro"}; label='numero_mobile' } | `
+        Where-Object {$_ -notmatch ' - BE'} | `
         Export-Csv -Path "$FolderFile\Temp_Result_Tel_Mobiles.CSV" -Delimiter ";" -Encoding UTF8 -NoTypeInformation
 
         # Loading the data from the new CSV file into memory
@@ -168,13 +197,25 @@ function MAJMobiles{
         for($j=0;$j -lt ($file_maj_mobiles.Length);$j++){
             $Nom_AD = ($file_maj_mobiles.nom_AD)[$j]
             $Phone = ($file_maj_mobiles.numero_mobile)[$j]
-            # Check if the person exists in the AD, if so, execute the code
+            # Verifie si la personne existe dans l'AD, si c'est le cas alors le code est execute
             if (Get-ADUser -Filter "Name -like ""$Nom_AD"""){
-                # The $identity variable dynamically retrieves the user's identity, which consists of the first letter of the first name followed by the first 7 letters of the last name
+                # La variable $identity recupere l'identite de l'utilisateur dynamiquement, l'identite de la personne est la premiere lettre du prenom suivie des 7 premieres lettres du nom de famille
                 $identity = (Get-ADUser -Filter "Name -like ""$Nom_AD""").SamAccountName
-                # Update the mobile phone field in the AD
-                Set-ADUser -Identity $identity -MobilePhone $Phone
-                #Write-Host "$Nom_AD -- $Phone" 
+                # Met a jour dans l'AD la case du numero de telephone mobile
+
+                if ( ((Get-aduser -Identity $identity -properties *).MobilePhone) -notlike $Phone){
+                    Set-ADUser -Identity $identity -MobilePhone $Phone
+                    $TextBox.AppendText("Personne : $Nom_AD, Tel mobile : $Phone`r`n")
+                    #Write-Host "$Nom_AD -- $Phone"
+                }
+            
+            # Mettre à jour la valeur de la barre de progression
+            $percentage = [math]::Round(($j / $totalMobiles) * 100 )
+            $ProgressBar.Value = $percentage
+
+            # Rafraîchir la fenêtre pour mettre à jour l'affichage de la barre de progression
+            $ProgressBar.Refresh()
+
             }     
         }
     }
@@ -201,39 +242,66 @@ function MAJEmployes{
         # Read the CSV file using a delimiter of ";"
         $EmploiCSV = Import-csv -Path $EmploiPath -Delimiter ";" -Encoding Default
         # For each row in the CSV file
+
+        $totalEmployes = $EmploiCSV.Count
+        $x = 0
+
+        $TextBox.AppendText("----- Poste/Société/Description mis à jour -----`r`n")
+
         foreach($row_emploi in $EmploiCSV){
-            # Combine the first name and last name of the person into a full name
+            #Combiner le prénom et le nom de la personne en un nom complet
             $nom_AD = $row_emploi.Prénom +" "+ $row_emploi.Nom
-            # Store the person's job
+            #Stockage de l'emploi de la personne
             $emploi = $row_emploi.Emploi
-            # Store the person's company
+            #Stockage de la société de la personne
             $societe = $row_emploi.Société
-            $Nsociete = $societe -replace ' S.A.S','' -replace 'SAS ',''
+            $Nsociete = $societe -replace 'POLE FORMATION PROGRES ET PERFORMANCES','PFP2' -replace 'STE NOUVELLE ','' -replace 'S.A.R.L   ','' -replace 'S.A.R.L. ','' -replace 'S.A.R.L.  ','' -replace 'GROUPE ','' -replace 'SARL ','' -replace ' ALBI','' -replace ' MAURY','' -replace 'SA ','' -replace ' SAS','' -replace ' S.A.S','' -replace 'SAS ','' -replace 'SOCIETE LYONNAISE DE PNEUMATIQUES ET ACCESSOIRES','SLPA' -replace ' Muret','' -replace 'MICHEL CHOUTEAU','HOLDING CHOUTEAU' -replace 'COMPTOIR DE RETZ DU PNEU','CRP'
             $Date_depart = $row_emploi.'Date départ'
             $Date_today = Get-Date -Format 'dd/MM/yyyy'
 
-            # Search for the person in Active Directory using their full name
+            #Recherche de la personne dans Active Directory en utilisant son nom complet
             if (Get-ADUser -Filter "Name -like ""$nom_AD""")
             {
                 if($Date_depart -like $null){
-                    # Store the username of the found person in Active Directory
+                    #Stockage du nom d'utilisateur de la personne trouvée dans Active Directory
+                    #Stockage du nom d'utilisateur de la personne trouvée dans Active Directory
                     $identity = (Get-ADUser -Filter "Name -like ""$nom_AD""").SamAccountName
-                    # Update the person's job and description in Active Directory
-                    Set-ADUser -Identity $identity -Title $emploi -Description $emploi -Company $Nsociete
-                    #Write-Host "$nom_AD --- $emploi --- $Nsociete"
+                    $old_title = (Get-ADUser -Identity $identity -Properties *).Title
+                    $old_description = (Get-ADUser -Identity $identity -Properties *).Description
+                    $old_company = (Get-ADUser -Identity $identity -Properties *).Company
+                    if (($old_title -notlike $emploi) -or ($old_description -notlike $emploi) -or ($old_company -notlike $Nsociete)){
+                        #Mettre à jour le poste et la description de la personne dans Active Directory
+                        Set-ADUser -Identity $identity -Title $emploi -Description $emploi -Company $Nsociete
+                        $TextBox.AppendText("Personne : $nom_AD, Poste/Description : $emploi, Société : $Nsociete`r`n")
+                        #Write-Host "$nom_AD --- $emploi --- $Nsociete"
+                    }
                 }
+
                 if($Date_depart -notlike $null){
                     $Date_depart_obj = [datetime]::ParseExact($Date_depart, "dd/MM/yyyy", $null)
                     $Date_today_obj = [datetime]::ParseExact($Date_today, "dd/MM/yyyy", $null)
                     if($Date_depart_obj -ge $Date_today_obj){
-                        # Store the username of the found person in Active Directory
+                        #Stockage du nom d'utilisateur de la personne trouvée dans Active Directory
                         $identity = (Get-ADUser -Filter "Name -like ""$nom_AD""").SamAccountName
-                        # Update position and person description in Active Directory
-                        Set-ADUser -Identity $identity -Title $emploi -Description $emploi -Company $Nsociete
-                        #Write-Host "$nom_AD --- $emploi --- $Nsociete"
+                        $old_title = (Get-ADUser -Identity $identity -Properties *).Title
+                        $old_description = (Get-ADUser -Identity $identity -Properties *).Description
+                        $old_company = (Get-ADUser -Identity $identity -Properties *).Company
+                        if (($old_title -notlike $emploi) -or ($old_description -notlike $emploi) -or ($old_company -notlike $Nsociete)){
+                            #Mettre à jour le poste et la description de la personne dans Active Directory
+                            Set-ADUser -Identity $identity -Title $emploi -Description $emploi -Company $Nsociete
+                            $TextBox.AppendText("Personne : $nom_AD, Poste/Description : $emploi, Société : $Nsociete`r`n")
+                            #Write-Host "$nom_AD --- $emploi --- $Nsociete"
+                        }
                     }
                 }
             }
+            $percentage = [math]::Round(($x / $totalEmployes) * 100 )
+            $x += 1
+            $ProgressBar.Value = $percentage
+
+            # Rafraîchir la fenêtre pour mettre à jour l'affichage de la barre de progression
+            $ProgressBar.Refresh()
+
         }
     }
 }
