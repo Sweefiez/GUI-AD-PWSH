@@ -154,6 +154,25 @@ $image1.Location = New-Object System.Drawing.Size(5,0)
 $image1.Size = New-Object System.Drawing.Size(520,210)
 $image1.Image = [System.Drawing.Image]::FromFile('C:\Images\Pictures.png')
 
+#Ajout d'une barre de progression pour visualiser l'avancement de la fonction
+$ProgressBar = New-Object System.Windows.Forms.ProgressBar
+$ProgressBar.Style = 'Continuous'
+$ProgressBar.Minimum = 0
+$ProgressBar.Maximum = 100
+
+$ProgressBar.Width = 470
+$ProgressBar.Height = 30
+$ProgressBar.Top = 210
+$ProgressBar.Left = 30
+
+# Ajout d'une boite de texte afin de visualiser en temps réel les informations qui sont mise à jour
+$TextBox = New-Object System.Windows.Forms.TextBox
+$TextBox.Multiline = $true
+$TextBox.ReadOnly = $true
+$TextBox.ScrollBars = "Vertical"
+$TextBox.Location = New-Object System.Drawing.Point(50,260)
+$TextBox.Size = New-Object System.Drawing.Size(430,130)
+
 # Add the above defibi controls to the window
 $window.Controls.Add($ButtonFixe)
 $window.Controls.Add($ButtonMobile)
@@ -172,9 +191,7 @@ $ButtonFixe.Add_Click({
 $messageBox = [System.Windows.Forms.MessageBox]::Show("Êtes-vous sûr de vouloir mettre à jour les numéros de téléphones fixes ?", "Confirmation", [System.Windows.Forms.MessageBoxButtons]::YesNo)
 if ($messageBox -eq "Yes") {
 # Executes the MAJFixes function created in the "Functions" file
-MAJFixes
-Write-Host "Les téléphones fixes sont mis à  jours"
-Write-Host "-------------------------------------------------"
+MAJFixes -ProgressBar $ProgressBar
 [System.Windows.MessageBox]::Show("Opération réalisée avec succès !")
 }
 $confirmButton.Visible = $false
@@ -187,9 +204,7 @@ $ButtonMobile.Add_Click({
 $messageBox = [System.Windows.Forms.MessageBox]::Show("Êtes-vous sûr de vouloir mettre à jour les numéros de téléphones mobiles ?", "Confirmation", [System.Windows.Forms.MessageBoxButtons]::YesNo)
 if ($messageBox -eq "Yes") {
 # Executes the MAJMobiles function created in the "Functions" file
-MAJMobiles
-Write-Host "Les téléphones mobiles sont mis à  jours"
-Write-Host "-------------------------------------------------"
+MAJMobiles -ProgressBar $ProgressBar
 [System.Windows.MessageBox]::Show("Opération réalisée avec succès !")
 }
 $confirmButton.Visible = $false
@@ -202,9 +217,7 @@ $ButtonFonction.Add_Click({
 $messageBox = [System.Windows.Forms.MessageBox]::Show("Êtes-vous sûr de vouloir mettre à jour les fonctions des employés ?", "Confirmation", [System.Windows.Forms.MessageBoxButtons]::YesNo)
 if ($messageBox -eq "Yes") {
 # Executes the MAJEmployes function created in the "Functions" file
-MAJEmployes
-Write-Host "Les fonctions des employés sont mise à  jours"
-Write-Host "-------------------------------------------------"
+MAJEmployes -ProgressBar $ProgressBar
 [System.Windows.MessageBox]::Show("Opération réalisée avec succès !")
 }
 $confirmButton.Visible = $false
@@ -218,13 +231,11 @@ $messageBox = [System.Windows.Forms.MessageBox]::Show("Êtes-vous sûr de vouloi
 if ($messageBox -eq "Yes") {
 # Execute the MAJFixes, MAJMobiles and MAJEmployes functions created in the "Functions" file, asking for the right file in a pop-up window at the start of each function execution.
 [System.Windows.MessageBox]::Show("Choisissez le ficheir Mitel svp")
-MAJFixes
+MAJFixes -ProgressBar $ProgressBar
 [System.Windows.MessageBox]::Show("Choisissez le ficheir Orange svp")
-MAJMobiles
+MAJMobiles -ProgressBar $ProgressBar
 [System.Windows.MessageBox]::Show("Choisissez le ficheir RH svp")
-MAJEmployes
-
-Write-Host "-------------------------------------------------"
+MAJEmployes -ProgressBar $ProgressBar
 [System.Windows.MessageBox]::Show("Opération réalisée avec succès !")
 }
 $confirmButton.Visible = $false
@@ -258,6 +269,7 @@ $backButton.Visible = $false
 })
 # Displays the window
 
+$window.StartPosition = "CenterScreen"
 $window.ShowDialog()
 
 # Disconnect the session created on the domain controller
